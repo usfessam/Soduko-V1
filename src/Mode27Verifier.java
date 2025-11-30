@@ -1,35 +1,24 @@
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.Vector;
 
 public class Mode27Verifier implements Verifier {
 
     @Override
     public void verify(int[][] board) {
-        // مخزن الأخطاء الآمن (Thread-Safe)
         List<String> errors = new Vector<>();
-        
-        // لستة هنحوش فيها كل الـ Threads عشان نعرف نشغلهم ونستناهم
         List<Thread> allThreads = new ArrayList<>();
 
-        // -------------------------------------------------
-        // أولاً: 9 Threads للصفوف
-        // -------------------------------------------------
+        // 1. Rows Threads
         for (int i = 0; i < 9; i++) {
-            final int currentRow = i; // لازم متغير final أو effectively final عشان يدخل جوه الثريد
+            final int currentRow = i;
             Thread t = new Thread(() -> {
-                if (!isValidUnit(board[currentRow])) {
-                    errors.add("ROW " + (currentRow + 1) + " is invalid");
-                }
+                Utils.analyzeSegment(board[currentRow], "ROW", currentRow, errors);
             });
             allThreads.add(t);
         }
 
-        // -------------------------------------------------
-        // ثانياً: 9 Threads للعواميد
-        // -------------------------------------------------
+        // 2. Columns Threads
         for (int i = 0; i < 9; i++) {
             final int currentCol = i;
             Thread t = new Thread(() -> {
@@ -37,27 +26,21 @@ public class Mode27Verifier implements Verifier {
                 for (int row = 0; row < 9; row++) {
                     columnData[row] = board[row][currentCol];
                 }
-                if (!isValidUnit(columnData)) {
-                    errors.add("COL " + (currentCol + 1) + " is invalid");
-                }
+                Utils.analyzeSegment(columnData, "COL", currentCol, errors);
             });
             allThreads.add(t);
         }
 
-        // -------------------------------------------------
-        // ثالثاً: 9 Threads للمربعات
-        // -------------------------------------------------
+        // 3. Boxes Threads
         for (int i = 0; i < 9; i++) {
             final int currentBoxIndex = i;
             Thread t = new Thread(() -> {
-                // حسبة رياضية عشان نعرف المربع رقم (i) ده بيبدأ منين
-                int boxRowStart = (currentBoxIndex / 3); // 0, 1, or 2
-                int boxColStart = (currentBoxIndex % 3); // 0, 1, or 2
+                int boxRowStart = (currentBoxIndex / 3);
+                int boxColStart = (currentBoxIndex % 3);
                 
                 int[] boxData = new int[9];
                 int index = 0;
                 
-                // نلم الـ 9 أرقام بتوع المربع ده
                 for (int r = 0; r < 3; r++) {
                     for (int c = 0; c < 3; c++) {
                         int actualRow = boxRowStart * 3 + r;
@@ -65,20 +48,14 @@ public class Mode27Verifier implements Verifier {
                         boxData[index++] = board[actualRow][actualCol];
                     }
                 }
-                
-                if (!isValidUnit(boxData)) {
-                    errors.add("BOX " + (currentBoxIndex + 1) + " is invalid");
-                }
+                Utils.analyzeSegment(boxData, "BOX", currentBoxIndex, errors);
             });
             allThreads.add(t);
         }
 
-        // 1. ياللا يا رجالة كله يشتغل! (Start all 27 threads)
-        for (Thread t : allThreads) {
-            t.start();
-        }
-
-        // 2. ياللا يا Main استنى لما كله يخلص (Join)
+        // تشغيل وانتظار
+        for (Thread t : allThreads) t.start();
+        
         for (Thread t : allThreads) {
             try {
                 t.join();
@@ -87,8 +64,16 @@ public class Mode27Verifier implements Verifier {
             }
         }
 
-        // 3. اطبع النتيجة
-        if (errors.isEmpty()) {
+        printResult(errors);
+    }
+
+    private void printResult(List<String> errors) {
+        boolean hasRealErrors = false;
+        for (String err : errors) {
+            if (!err.startsWith("-")) hasRealErrors = true;
+        }
+
+        if (!hasRealErrors) {
             System.out.println("VALID");
         } else {
             System.out.println("INVALID");
@@ -96,17 +81,5 @@ public class Mode27Verifier implements Verifier {
                 System.out.println(error);
             }
         }
-    }
-
-    // نفس دالة المساعدة اللي معانا من الأول
-    private boolean isValidUnit(int[] unit) {
-        Set<Integer> seen = new HashSet<>();
-        for (int num : unit) {
-            if (num < 1 || num > 9 || seen.contains(num)) {
-                return false;
-            }
-            seen.add(num);
-        }
-        return true;
     }
 }
